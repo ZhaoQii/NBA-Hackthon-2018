@@ -13,31 +13,36 @@ each_game <- function(game_df){
 
 each_quater <- function(game_id, quater_no, pre_stat, game_df){
   this_stat <- pre_stat
+  this_quater <- filter(game_df, Period == quater_no)
   this_quater_start <- filter(Lineup, Game_id == game_id, Period == quater_no) %>% select(Game_id, Team_id, Person_id)
   new_players_index <- this_quater_start$Person_id %in% this_stat[, 3]
   if (sum(new_players_index) != 10){
     this_stat <- rbind(this_stat, cbind(this_quater_start[!new_players_index,], '+/-' = 0))
   }
   
-  this_quater_sub <- filter(game_df, Event_Msg_Type == 8 | Event_Msg_Type == 11, Period == quater_no) %>% select(Game_id, Team_id, Person2)
-  new_sub <- this_quater_sub$Person2 %in% this_stat$Person_id
+  this_quater_sub <- filter(game_df, Event_Msg_Type == 8 | Event_Msg_Type == 11, Period == quater_no) %>% select(Game_id, Person1, Person2)
+  find_teamid <- this_stat$Team_id[match(this_quater_sub$Person1, this_stat$Person_id)]
+  this_quater_sub <- data.frame('Game_id' = this_quater_sub$Game_id, 'Team_id' = find_teamid, 'Person2' = this_quater_sub$Person2)
+  this_quater_sub <- this_quater_sub[complete.cases(this_quater_sub), ]
+  new_sub <- this_quater_sub$Person %in% this_stat$Person_id
   if (sum(new_sub) != length(new_sub)){
     new_sub <- cbind(this_quater_sub[!new_sub,], 0)
     colnames(new_sub) <- c('Game_id', 'Team_id', 'Person_id', '+/-')
     this_stat <- rbind(this_stat,unique(new_sub[, 1:4]))
   }
+  
+  this_quater$Real_team <- this_stat$Team_id[match(this_quater$Person1, this_stat$Person_id)]
   this_stat$'+/-' <- this_stat$'+/-' + apply(this_stat, MARGIN = 1,
-                                             FUN = cal_player, game_df = game_df,
-                                             quater_no = quater_no,
+                                             FUN = cal_player, this_quater = this_quater,
                                              this_quater_start = this_quater_start)
   
   return(this_stat)
 }
 
-cal_player <- function(id, game_df, quater_no, this_quater_start){
+
+cal_player <- function(id, this_quater, this_quater_start, this_stat){   ## 07/10  12：00am
   person_id <- id[3]
   team_id <- id[2]
-  this_quater <- filter(game_df, Period == quater_no)
   is_start <- person_id %in% this_quater_start$Person_id
   ins_outs <- find_ins_outs(person_id, this_quater, is_start)
   ins_outs <- matrix(ins_outs[complete.cases(ins_outs)], ncol = 2)
@@ -54,7 +59,7 @@ find_ins_outs <- function(person_id, this_quater, is_start){
   for(eachin in in_index){
     pc_time <- this_quater[eachin, 'PC_Time']
     wc_time <- this_quater[eachin, 'WC_Time']
-    in_out_matrix[s + 1, 1] <- 1 + eachin + nrow( filter(this_quater, PC_Time == pc_time, WC_Time > wc_time) )
+    in_out_matrix[s + 1, 1] <- 1 + eachin + nrow( filter(this_quater, PC_Time == pc_time & WC_Time > wc_time) )
     s <- s + 1
   }
   
@@ -66,7 +71,7 @@ find_ins_outs <- function(person_id, this_quater, is_start){
     for (eachout in out_indexs){
       pc_time <- this_quater[eachout, 'PC_Time']
       wc_time <- this_quater[eachout, 'WC_Time']
-      in_out_matrix[s, 2] <- eachout + nrow( filter(this_quater, PC_Time == pc_time, WC_Time > wc_time) )
+      in_out_matrix[s, 2] <- eachout + nrow( filter(this_quater, PC_Time == pc_time & WC_Time > wc_time) )
       s <- s + 1
     }
     
@@ -91,10 +96,10 @@ cal_pm <- function(row, this_quater, team_id){
 
 sum_int <- function(interval, team_id, type){
   if (type == 1) {
-    on <- filter(interval, Team_id == team_id & Event_Msg_Type == 1)
+    on <- filter(interval, Real_team == team_id & Event_Msg_Type == 1)
     s <- ifelse(nrow(on) == 0, 0, sum(select(on, Option1)))
   } else {
-    on <- filter(interval, Team_id == team_id & Event_Msg_Type == 3 & Option1 == 1)
+    on <- filter(interval, Real_team == team_id & Event_Msg_Type == 3 & Option1 == 1)
     s <- nrow(on)
   }
   return(s)
