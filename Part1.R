@@ -9,7 +9,10 @@ Lineup <- read.delim('Basketball Analytics/NBA Hackathon - Game Lineup Data Samp
 Play <- read.delim('Basketball Analytics/NBA Hackathon - Play by Play Data Sample (50 Games).txt', as.is = T)
 
 # Extract the part necessary to compute +/-
-score_sub <- Play %>% filter(Event_Msg_Type == 1 | Event_Msg_Type == 3 | Event_Msg_Type == 8 | Event_Msg_Type == 11)
+
+# score_sub <- Play %>% filter(Event_Msg_Type == 1 | Event_Msg_Type == 3 | Event_Msg_Type == 8 | Event_Msg_Type == 11)
+# Jul 10 updates:
+score_sub <- Play %>% filter(Event_Msg_Type == 1 | Event_Msg_Type == 3 | Event_Msg_Type == 8)
 result <- split(score_sub, f = score_sub$Game_id)
 
 
